@@ -1,7 +1,10 @@
 .idea/
 __pycache__/
 
-data/
-log/
-model/
-sample/
+data/image/*
+data/tfrecords/*
+log/*
+model/*
+sample/*
+
+!.gitkeep
