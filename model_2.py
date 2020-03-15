@@ -1,34 +1,38 @@
 # coding:utf-8
 # WDCGAN-GP without batch normalization
+from util import *
 import tensorflow as tf
 import numpy as np
-from util import visualize, read_images, read_tfrecords
-import os
 
 
 def discriminator(image, reuse=tf.AUTO_REUSE):
-    ki = tf.initializers.random_normal(stddev=0.01)
+    ki = tf.initializers.random_normal(stddev=0.1)
     with tf.variable_scope("discriminator", reuse=reuse):
-        d_00 = tf.layers.conv2d(image, 12, 3, (2, 2), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_00")  # 64*64*12
-        d_01 = tf.layers.conv2d(d_00, 24, 3, (2, 2), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_01")  # 32*32*24
-        d_02 = tf.layers.conv2d(d_01, 48, 3, (2, 2), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_02")  # 16*16*48
-        d_03 = tf.layers.conv2d(d_02, 96, 3, (2, 2), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_03")  # 8*8*96
-        d_04 = tf.layers.flatten(d_03, name="dis_04")  # 6144
-        d_05 = tf.layers.dense(d_04, 256, activation=tf.nn.leaky_relu, name="dis_05")  # 256
-        d_06 = tf.layers.dense(d_05, 1, name="dis_06")  # 1
-        return d_06
+        d_00 = tf.layers.conv2d(image, 24, 5, (2, 2), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_00")  # 64*64*24
+        # d_01 = tf.layers.conv2d(d_00, 24, 3, (1, 1), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_01")  # 64*64*24
+        # d_02 = tf.layers.conv2d(d_01, 48, 5, (2, 2), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_02")  # 32*32*48
+        # d_03 = tf.layers.conv2d(d_02, 48, 3, (1, 1), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_03")  # 32*32*48
+        # d_04 = tf.layers.conv2d(d_03, 96, 5, (2, 2), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_04")  # 16*16*96
+        # d_05 = tf.layers.conv2d(d_04, 96, 3, (1, 1), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="dis_05")  # 16*16*96
+        d_06 = tf.layers.flatten(d_00, name="dis_06")  # 98304
+        d_07 = tf.layers.dense(d_06, 1024, activation=tf.nn.tanh, kernel_initializer=ki, name="dis_07")  # 4096
+        d_08 = tf.layers.dense(d_07, 256, kernel_initializer=ki, name="dis_08")  # 256
+        return d_08
 
 
 def generator(rand_z, reuse=tf.AUTO_REUSE):
-    ki = tf.initializers.random_normal(stddev=0.01)
+    ki = tf.initializers.random_normal(stddev=0.1)
     with tf.variable_scope("generator", reuse=reuse):
-        g_00 = tf.layers.dense(rand_z, 6144, activation=tf.nn.relu, name="gen_00")  # 6144
-        g_01 = tf.reshape(g_00, [-1, 8, 8, 96], name="gen_01")  # 8*8*96
-        g_02 = tf.layers.conv2d_transpose(g_01, 48, 3, (2, 2), "same", activation=tf.nn.relu, kernel_initializer=ki, name="gen_02")  # 16*16*48
-        g_03 = tf.layers.conv2d_transpose(g_02, 24, 3, (2, 2), "same", activation=tf.nn.relu, kernel_initializer=ki, name="gen_03")  # 32*32*24
-        g_04 = tf.layers.conv2d_transpose(g_03, 12, 3, (2, 2), "same", activation=tf.nn.relu, kernel_initializer=ki, name="gen_04")  # 64*64*12
-        g_05 = tf.layers.conv2d_transpose(g_04, 3, 3, (2, 2), "same", activation=tf.nn.tanh, kernel_initializer=ki, name="gen_05")  # 128*128*3
-        return g_05
+        g_00 = tf.layers.dense(rand_z, 1024, activation=tf.nn.leaky_relu, kernel_initializer=ki, name="gen_00")  # 4096
+        g_01 = tf.layers.dense(g_00, 98304, activation=tf.nn.leaky_relu, kernel_initializer=ki, name="gen_01")  # 24576
+        g_02 = tf.reshape(g_01, [-1, 64, 64, 24], name="gen_03")  # 16*16*96
+        # g_03 = tf.layers.conv2d_transpose(g_02, 96, 5, (2, 2), "same", activation=tf.nn.relu, kernel_initializer=ki, name="gen_04")  # 32*32*96
+        # g_04 = tf.layers.conv2d_transpose(g_03, 48, 3, (1, 1), "same", activation=tf.nn.relu, kernel_initializer=ki, name="gen_05")  # 32*32*48
+        # g_05 = tf.layers.conv2d_transpose(g_04, 48, 5, (2, 2), "same", activation=tf.nn.relu, kernel_initializer=ki, name="gen_06")  # 64*64*48
+        # g_06 = tf.layers.conv2d_transpose(g_05, 24, 3, (1, 1), "same", activation=tf.nn.relu, kernel_initializer=ki, name="gen_07")  # 64*64*24
+        g_07 = tf.layers.conv2d_transpose(g_02, 24, 5, (2, 2), "same", activation=tf.nn.leaky_relu, kernel_initializer=ki, name="gen_08")  # 128*128*24
+        g_08 = tf.layers.conv2d_transpose(g_07, 3, 3, (1, 1), "same", activation=tf.nn.tanh, kernel_initializer=ki, name="gen_09")  # 128*128*3
+        return g_08
 
 
 def model(batch_size: int, real_image_uint8, rand_z_size: int):
@@ -65,8 +69,8 @@ def train(start_step, restore):
     gen_vars = [var for var in tf.trainable_variables() if "gen" in var.name]
 
     global_step = tf.Variable(0, trainable=False)
-    dis_lr = tf.train.exponential_decay(learning_rate=0.000004, global_step=global_step, decay_steps=100, decay_rate=0.90)
-    gen_lr = tf.train.exponential_decay(learning_rate=0.000020, global_step=global_step, decay_steps=100, decay_rate=0.90)
+    dis_lr = tf.train.exponential_decay(learning_rate=0.00001, global_step=global_step, decay_steps=100, decay_rate=0.90)
+    gen_lr = tf.train.exponential_decay(learning_rate=0.00005, global_step=global_step, decay_steps=100, decay_rate=0.90)
 
     dis_op = tf.train.RMSPropOptimizer(dis_lr).minimize(m_dis_loss, var_list=dis_vars, colocate_gradients_with_ops=True)
     gen_op = tf.train.RMSPropOptimizer(gen_lr).minimize(m_gen_loss, var_list=gen_vars, colocate_gradients_with_ops=True)
@@ -74,7 +78,7 @@ def train(start_step, restore):
     sess = tf.Session()
     sess.run(tf.global_variables_initializer())
     summary_writer = tf.summary.FileWriter("log", sess.graph)
-    saver = tf.train.Saver(var_list=tf.global_variables(), max_to_keep=10)
+    saver = tf.train.Saver(var_list=tf.global_variables(), max_to_keep=5)
     if restore:
         saver.restore(sess, "model/model.ckpt-%d" % start_step)
 
